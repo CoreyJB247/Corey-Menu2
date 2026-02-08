@@ -541,7 +541,10 @@ function OpenMiscMenu()
         title = 'Misc Options',
         position = 'top-right',
         onClose = function()
-            -- Optional: handle menu close
+            -- Return to unified menu if it exists
+            if lib.getOpenMenu() == nil then
+                ExecuteCommand('menu')
+            end
         end,
         options = {
             {
