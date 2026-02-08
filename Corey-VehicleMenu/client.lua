@@ -1979,7 +1979,7 @@ function openWindowTintMenu()
 end
 
 -- Neon Lights Menu
-function openNeonLightsMenu()
+function openNeonLightsMenu(startIndex)
     local ped = PlayerPedId()
     local vehicle = GetVehiclePedIsIn(ped, false)
     
@@ -2055,7 +2055,8 @@ function openNeonLightsMenu()
                 SetVehicleNeonLightEnabled(vehicle, pos.id, not allEnabled)
             end
             lib.notify({title = 'Neon Lights', description = allEnabled and 'All Disabled' or 'All Enabled', type = 'success'})
-            openNeonLightsMenu()
+            Wait(50)
+            openNeonLightsMenu(selected)
         elseif selected == #options then
             openVisualModsMenu()
         elseif selected == #options - 1 then
@@ -2070,16 +2071,18 @@ function openNeonLightsMenu()
                 SetVehicleNeonLightsColour(vehicle, input[1], input[2], input[3])
                 lib.notify({title = 'Neon Color Changed', type = 'success'})
             end
-            openNeonLightsMenu()
+            Wait(50)
+            openNeonLightsMenu(selected)
         elseif options[selected].args then
             local isEnabled = IsVehicleNeonLightEnabled(vehicle, options[selected].args.posId)
             SetVehicleNeonLightEnabled(vehicle, options[selected].args.posId, not isEnabled)
             lib.notify({title = options[selected].args.posName .. ' Neon', description = isEnabled and 'Disabled' or 'Enabled', type = 'success'})
-            openNeonLightsMenu()
+            Wait(50)
+            openNeonLightsMenu(selected)
         end
     end)
     
-    lib.showMenu('neon_lights_menu')
+    lib.showMenu('neon_lights_menu', startIndex or 1)
 end
 
 -- Wheels Menu
@@ -2144,7 +2147,7 @@ function openWheelColorMenu()
     lib.showMenu('wheel_color_menu')
 end
 
-function openWheelAccessoriesMenu()
+function openWheelAccessoriesMenu(startIndex)
     local ped = PlayerPedId()
     local vehicle = GetVehiclePedIsIn(ped, false)
     
@@ -2219,7 +2222,8 @@ function openWheelAccessoriesMenu()
             else
                 lib.notify({title = 'Error', description = 'Install custom wheels first', type = 'error'})
             end
-            openWheelAccessoriesMenu()
+            Wait(50)
+            openWheelAccessoriesMenu(selected)
         elseif selected == 2 then
             local r, g, b = GetVehicleTyreSmokeColor(vehicle)
             local input = lib.inputDialog('Tire Smoke Color (RGB)', {
@@ -2234,11 +2238,13 @@ function openWheelAccessoriesMenu()
                 SetVehicleTyreSmokeColor(vehicle, input[1], input[2], input[3])
                 lib.notify({title = 'Tire Smoke Color Changed', type = 'success'})
             end
-            openWheelAccessoriesMenu()
+            Wait(50)
+            openWheelAccessoriesMenu(selected)
         elseif selected == 3 then
             SetVehicleTyresCanBurst(vehicle, hasBulletproofTires)
             lib.notify({title = 'Bulletproof Tires', description = hasBulletproofTires and 'Disabled' or 'Enabled', type = 'success'})
-            openWheelAccessoriesMenu()
+            Wait(50)
+            openWheelAccessoriesMenu(selected)
         elseif selected == 4 and currentMod ~= -1 then
             openWheelColorMenu()
         elseif selected == #options then
@@ -2246,7 +2252,7 @@ function openWheelAccessoriesMenu()
         end
     end)
     
-    lib.showMenu('wheel_accessories_menu')
+    lib.showMenu('wheel_accessories_menu', startIndex or 1)
 end
 
 function openWheelModMenu(wheelType, wheelTypeName, parentMenu)
@@ -2402,7 +2408,7 @@ function openWheelsMenu()
 end
 
 -- Extras and Livery Menu
-local function openExtrasAndLiveryMenu()
+local function openExtrasAndLiveryMenu(startIndex)
     local ped = PlayerPedId()
     local vehicle = GetVehiclePedIsIn(ped, false)
     
@@ -2476,16 +2482,18 @@ local function openExtrasAndLiveryMenu()
         elseif options[selected].args and options[selected].args.liveryIndex then
             SetVehicleLivery(vehicle, options[selected].args.liveryIndex)
             lib.notify({title = 'Livery Changed', description = 'Livery ' .. (options[selected].args.liveryIndex + 1), type = 'success'})
-            openExtrasAndLiveryMenu()
+            Wait(50)
+            openExtrasAndLiveryMenu(selected)
         elseif options[selected].args and options[selected].args.extraId then
             local isOn = IsVehicleExtraTurnedOn(vehicle, options[selected].args.extraId)
             SetVehicleExtra(vehicle, options[selected].args.extraId, isOn and 1 or 0)
             lib.notify({title = 'Extra ' .. options[selected].args.extraId, description = isOn and 'Disabled' or 'Enabled', type = 'info'})
-            openExtrasAndLiveryMenu()
+            Wait(50)
+            openExtrasAndLiveryMenu(selected)
         end
     end)
     
-    lib.showMenu('extras_livery_menu')
+    lib.showMenu('extras_livery_menu', startIndex or 1)
 end
 
 -- Horn Menu
@@ -2793,7 +2801,7 @@ function openVehicleCustomizationMenu()
     lib.showMenu('vehicle_customization_menu')
 end
 
-function openDoorsMenu()
+function openDoorsMenu(startIndex)
     local ped = PlayerPedId()
     local vehicle = GetVehiclePedIsIn(ped, false)
     
@@ -2854,7 +2862,8 @@ function openDoorsMenu()
                 SetVehicleDoorShut(vehicle, i, false)
             end
             lib.notify({title = 'All Doors Closed', type = 'success'})
-            openDoorsMenu()
+            Wait(50)
+            openDoorsMenu(selected)
         else
             local currentVeh = GetVehiclePedIsIn(PlayerPedId(), false)
             local currentState = GetVehicleDoorAngleRatio(currentVeh, options[selected].args.doorId) > 0
@@ -2867,15 +2876,15 @@ function openDoorsMenu()
                 lib.notify({title = options[selected].args.doorName, description = 'Opened', type = 'success'})
             end
             
-            Wait(100)
-            openDoorsMenu()
+            Wait(50)
+            openDoorsMenu(selected)
         end
     end)
     
-    lib.showMenu('doors_menu')
+    lib.showMenu('doors_menu', startIndex or 1)
 end
 
-function openWindowsMenu()
+function openWindowsMenu(startIndex)
     local ped = PlayerPedId()
     local vehicle = GetVehiclePedIsIn(ped, false)
     
@@ -2931,7 +2940,8 @@ function openWindowsMenu()
         elseif selected == #options - 1 then
             RollDownWindows(vehicle)
             lib.notify({title = 'All Windows Rolled Down', type = 'success'})
-            openWindowsMenu()
+            Wait(50)
+            openWindowsMenu(selected)
         else
             if IsVehicleWindowIntact(vehicle, options[selected].args.windowId) then
                 RollDownWindow(vehicle, options[selected].args.windowId)
@@ -2940,11 +2950,12 @@ function openWindowsMenu()
                 RollUpWindow(vehicle, options[selected].args.windowId)
                 lib.notify({title = options[selected].args.windowName, description = 'Rolled up', type = 'success'})
             end
-            openWindowsMenu()
+            Wait(50)
+            openWindowsMenu(selected)
         end
     end)
     
-    lib.showMenu('windows_menu')
+    lib.showMenu('windows_menu', startIndex or 1)
 end
 
 function openVehicleMenu()
