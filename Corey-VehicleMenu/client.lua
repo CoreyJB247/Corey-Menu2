@@ -1757,7 +1757,7 @@ local function openLicensePlateMenu()
 end
 
 -- Performance Mods Menu
-function openPerformanceModsMenu()
+function openPerformanceModsMenu(startIndex)
     local ped = PlayerPedId()
     local vehicle = GetVehiclePedIsIn(ped, false)
     
@@ -1776,27 +1776,52 @@ function openPerformanceModsMenu()
         {modType = 16, name = 'Armor', icon = 'shield-halved'}
     }
     
+    local performanceLabels = {
+        [11] = {'Stock Engine', 'Level 1 Engine', 'Level 2 Engine', 'Level 3 Engine', 'Level 4 Engine'},
+        [12] = {'Stock Brakes', 'Street Brakes', 'Sport Brakes', 'Race Brakes'},
+        [13] = {'Stock Transmission', 'Street Transmission', 'Sport Transmission', 'Race Transmission'},
+        [15] = {'Stock Suspension', 'Lowered Suspension', 'Street Suspension', 'Sport Suspension', 'Competition Suspension'},
+        [16] = {'No Armor', 'Armor Upgrade 20%', 'Armor Upgrade 40%', 'Armor Upgrade 60%', 'Armor Upgrade 80%', 'Armor Upgrade 100%'}
+    }
+    
     local options = {}
     
     -- Turbo option
     local hasTurbo = IsToggleModOn(vehicle, 18)
     table.insert(options, {
         label = 'Turbo',
-        description = 'Status: ' .. (hasTurbo and 'ON' or 'OFF'),
         icon = 'wind',
-        iconColor = hasTurbo and '#00ff00' or '#ff0000'
+        values = {'Disabled', 'Enabled'},
+        defaultIndex = hasTurbo and 2 or 1,
+        args = {modType = 18}
     })
     
-    -- Performance mods
+    -- Performance mods with arrow navigation
     for _, mod in ipairs(performanceMods) do
         local maxMod = GetNumVehicleMods(vehicle, mod.modType)
         if maxMod > 0 then
+            local currentMod = GetVehicleMod(vehicle, mod.modType)
+            local modLabels = {}
+            
+            -- Build labels array
+            for i = -1, maxMod - 1 do
+                if performanceLabels[mod.modType] and performanceLabels[mod.modType][i + 2] then
+                    modLabels[i + 2] = performanceLabels[mod.modType][i + 2]
+                else
+                    if i == -1 then
+                        modLabels[1] = 'Stock'
+                    else
+                        modLabels[i + 2] = 'Upgrade ' .. (i + 1)
+                    end
+                end
+            end
+            
             table.insert(options, {
                 label = mod.name,
-                description = 'Configure ' .. mod.name:lower() .. ' upgrades',
                 icon = mod.icon,
-                iconColor = '#1E90FF',
-                args = {modType = mod.modType, modName = mod.name}
+                values = modLabels,
+                defaultIndex = currentMod + 2, -- +2 because index 1 is stock (-1)
+                args = {modType = mod.modType, modName = mod.name, maxMod = maxMod}
             })
         end
     end
@@ -1805,8 +1830,7 @@ function openPerformanceModsMenu()
         table.insert(options, {
             label = 'No Performance Mods Available',
             description = 'This vehicle has no performance mods',
-            icon = 'circle-xmark',
-            iconColor = '#ff0000'
+            icon = 'circle-xmark'
         })
     end
     
@@ -1814,31 +1838,42 @@ function openPerformanceModsMenu()
         label = '← Back',
         description = 'Return to customization',
         icon = 'arrow-left',
-        iconColor = '#95a5a6'
+        args = {action = 'back'}
     })
     
     lib.registerMenu({
         id = 'performance_mods_menu',
         title = 'Performance Upgrades',
         position = 'top-right',
-        
         onClose = function()
             openVehicleCustomizationMenu()
         end,
+        onSideScroll = function(selected, scrollIndex, args)
+            if not options[selected].args then return end
+            
+            if options[selected].args.modType == 18 then
+                -- Turbo toggle
+                ToggleVehicleMod(vehicle, 18, scrollIndex == 2)
+            elseif options[selected].args.modType then
+                -- Other performance mods
+                local modIndex = scrollIndex - 2 -- Convert back to game index
+                if modIndex == -1 then
+                    RemoveVehicleMod(vehicle, options[selected].args.modType)
+                else
+                    SetVehicleMod(vehicle, options[selected].args.modType, modIndex, false)
+                end
+            end
+        end,
         options = options
     }, function(selected, scrollIndex, args)
-        if selected == 1 then
-            ToggleVehicleMod(vehicle, 18, not hasTurbo)
-            lib.notify({title = 'Turbo', description = hasTurbo and 'Disabled' or 'Enabled', type = 'success'})
-            openPerformanceModsMenu()
-        elseif selected == #options then
+        if not options[selected].args then return end
+        
+        if options[selected].args.action == 'back' then
             openVehicleCustomizationMenu()
-        elseif options[selected].args then
-            openSpecificModMenu(options[selected].args.modType, options[selected].args.modName, 'performance_mods_menu')
         end
     end)
     
-    lib.showMenu('performance_mods_menu')
+    lib.showMenu('performance_mods_menu', startIndex or 1)
 end
 
 -- Specific Mod Selection Menu
@@ -2596,7 +2631,7 @@ local function openHornMenu()
 end
 
 -- Visual Mods Menu
-function openVisualModsMenu()
+function openVisualModsMenu(startIndex)
     local ped = PlayerPedId()
     local vehicle = GetVehiclePedIsIn(ped, false)
     
@@ -2644,33 +2679,47 @@ function openVisualModsMenu()
     local options = {
         {
             label = 'Window Tint',
-            description = 'Change window tint level',
             icon = 'window-maximize',
-            iconColor = '#696969'
+            args = {action = 'window_tint'}
         },
         {
             label = 'Neon Lights',
-            description = 'Configure neon underglow',
             icon = 'lightbulb',
-            iconColor = '#FF1493'
+            args = {action = 'neon'}
         },
         {
             label = 'Wheels',
-            description = 'Browse wheels by category',
             icon = 'circle',
-            iconColor = '#FFD700'
+            args = {action = 'wheels'}
         }
     }
     
+    -- Add all visual mods with arrow navigation
     for _, mod in ipairs(visualMods) do
         local maxMod = GetNumVehicleMods(vehicle, mod.modType)
         if maxMod > 0 then
+            local currentMod = GetVehicleMod(vehicle, mod.modType)
+            local modLabels = {}
+            
+            -- Build labels array
+            modLabels[1] = 'Stock'
+            for i = 0, maxMod - 1 do
+                local modLabel = GetModTextLabel(vehicle, mod.modType, i)
+                local labelText = GetLabelText(modLabel)
+                
+                if labelText and labelText ~= modLabel and labelText ~= 'NULL' then
+                    modLabels[i + 2] = labelText
+                else
+                    modLabels[i + 2] = 'Upgrade ' .. (i + 1)
+                end
+            end
+            
             table.insert(options, {
                 label = mod.name,
-                description = 'Configure ' .. mod.name:lower(),
                 icon = mod.icon,
-                iconColor = '#9370DB',
-                args = {modType = mod.modType, modName = mod.name}
+                values = modLabels,
+                defaultIndex = currentMod + 2, -- +2 because index 1 is stock (-1)
+                args = {modType = mod.modType, modName = mod.name, maxMod = maxMod}
             })
         end
     end
@@ -2679,33 +2728,44 @@ function openVisualModsMenu()
         label = '← Back',
         description = 'Return to customization',
         icon = 'arrow-left',
-        iconColor = '#95a5a6'
+        args = {action = 'back'}
     })
     
     lib.registerMenu({
         id = 'visual_mods_menu',
         title = 'Visual Modifications',
         position = 'top-right',
-        
         onClose = function()
             openVehicleCustomizationMenu()
         end,
+        onSideScroll = function(selected, scrollIndex, args)
+            if not options[selected].args or not options[selected].args.modType then return end
+            
+            local modIndex = scrollIndex - 2 -- Convert back to game index
+            if modIndex == -1 then
+                RemoveVehicleMod(vehicle, options[selected].args.modType)
+            else
+                SetVehicleMod(vehicle, options[selected].args.modType, modIndex, false)
+            end
+        end,
         options = options
     }, function(selected, scrollIndex, args)
-        if selected == 1 then
+        if not options[selected].args then
+            return
+        end
+        
+        if options[selected].args.action == 'window_tint' then
             openWindowTintMenu()
-        elseif selected == 2 then
+        elseif options[selected].args.action == 'neon' then
             openNeonLightsMenu()
-        elseif selected == 3 then
+        elseif options[selected].args.action == 'wheels' then
             openWheelsMenu()
-        elseif selected == #options then
+        elseif options[selected].args.action == 'back' then
             openVehicleCustomizationMenu()
-        elseif options[selected].args then
-            openSpecificModMenu(options[selected].args.modType, options[selected].args.modName, 'visual_mods_menu')
         end
     end)
     
-    lib.showMenu('visual_mods_menu')
+    lib.showMenu('visual_mods_menu', startIndex or 1)
 end
 
 function openVehicleCustomizationMenu()
