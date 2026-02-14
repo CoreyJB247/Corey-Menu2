@@ -1291,7 +1291,7 @@ function openSavedVehiclesMenu()
     lib.showMenu('saved_vehicles_menu')
 end
 
-function openEmergencySubcategoryMenu(subcategory)
+function openEmergencySubcategoryMenu(subcategory, startIndex)
     local options = {}
     
     for _, vehicle in ipairs(subcategory.vehicles) do
@@ -1324,12 +1324,12 @@ function openEmergencySubcategoryMenu(subcategory)
             openEmergencyMenu()
         else
             SpawnVehicle(options[selected].args.model, nil, true, function()
-                openEmergencySubcategoryMenu(subcategory)
+                openEmergencySubcategoryMenu(subcategory, selected)
             end)
         end
     end)
     
-    lib.showMenu('emergency_subcategory_menu')
+    lib.showMenu('emergency_subcategory_menu', startIndex or 1)
 end
 
 function openEmergencyMenu()
@@ -1371,7 +1371,7 @@ function openEmergencyMenu()
     lib.showMenu('emergency_main_menu')
 end
 
-function openAddonSubcategoryMenu(subcategory)
+function openAddonSubcategoryMenu(subcategory, startIndex)
     local options = {}
     
     for _, vehicle in ipairs(subcategory.vehicles) do
@@ -1404,12 +1404,12 @@ function openAddonSubcategoryMenu(subcategory)
             openAddonMenu()
         else
             SpawnVehicle(options[selected].args.model, nil, true, function()
-                openAddonSubcategoryMenu(subcategory)
+                openAddonSubcategoryMenu(subcategory, selected)
             end)
         end
     end)
     
-    lib.showMenu('addon_subcategory_menu')
+    lib.showMenu('addon_subcategory_menu', startIndex or 1)
 end
 
 function openAddonMenu()
@@ -1451,7 +1451,7 @@ function openAddonMenu()
     lib.showMenu('addon_main_menu')
 end
 
-function openCategoryMenu(category)
+function openCategoryMenu(category, startIndex)
     local options = {}
     
     for _, vehicle in ipairs(category.models) do
@@ -1484,12 +1484,12 @@ function openCategoryMenu(category)
             openVehicleSpawnerMenu()
         else
             SpawnVehicle(options[selected].args.model, nil, true, function()
-                openCategoryMenu(category)
+                openCategoryMenu(category, selected)
             end)
         end
     end)
     
-    lib.showMenu('vehicle_category_menu')
+    lib.showMenu('vehicle_category_menu', startIndex or 1)
 end
 
 function openVehicleSpawnerMenu()
@@ -1563,7 +1563,7 @@ function openVehicleSpawnerMenu()
 end
 
 -- Vehicle Customization Functions
-function openPrimaryColorMenu()
+function openPrimaryColorMenu(startIndex)
     local ped = PlayerPedId()
     local vehicle = GetVehiclePedIsIn(ped, false)
     
@@ -1614,14 +1614,14 @@ function openPrimaryColorMenu()
             local _, secondary = GetVehicleColours(vehicle)
             SetVehicleColours(vehicle, options[selected].args.colorId, secondary)
             lib.notify({title = 'Color Changed', description = options[selected].args.colorName, type = 'success'})
-            openPrimaryColorMenu()
+            openPrimaryColorMenu(selected)
         end
     end)
     
-    lib.showMenu('primary_color_menu')
+    lib.showMenu('primary_color_menu', startIndex or 1)
 end
 
-function openSecondaryColorMenu()
+function openSecondaryColorMenu(startIndex)
     local ped = PlayerPedId()
     local vehicle = GetVehiclePedIsIn(ped, false)
     
@@ -1672,11 +1672,11 @@ function openSecondaryColorMenu()
             local primary, _ = GetVehicleColours(vehicle)
             SetVehicleColours(vehicle, primary, options[selected].args.colorId)
             lib.notify({title = 'Color Changed', description = options[selected].args.colorName, type = 'success'})
-            openSecondaryColorMenu()
+            openSecondaryColorMenu(selected)
         end
     end)
     
-    lib.showMenu('secondary_color_menu')
+    lib.showMenu('secondary_color_menu', startIndex or 1)
 end
 
 local function openLicensePlateMenu()
@@ -1842,7 +1842,7 @@ function openPerformanceModsMenu()
 end
 
 -- Specific Mod Selection Menu
-function openSpecificModMenu(modType, modName, parentMenu)
+function openSpecificModMenu(modType, modName, parentMenu, startIndex)
     local ped = PlayerPedId()
     local vehicle = GetVehiclePedIsIn(ped, false)
     
@@ -1925,7 +1925,7 @@ function openSpecificModMenu(modType, modName, parentMenu)
         if selected == 1 then
             RemoveVehicleMod(vehicle, modType)
             lib.notify({title = modName, description = 'Removed', type = 'success'})
-            openSpecificModMenu(modType, modName, parentMenu)
+            openSpecificModMenu(modType, modName, parentMenu, selected)
         elseif selected == #options then
             if parentMenu == 'performance_mods_menu' then
                 openPerformanceModsMenu()
@@ -1935,15 +1935,15 @@ function openSpecificModMenu(modType, modName, parentMenu)
         elseif options[selected].args then
             SetVehicleMod(vehicle, modType, options[selected].args.modIndex, false)
             lib.notify({title = modName, description = options[selected].args.modDisplayName, type = 'success'})
-            openSpecificModMenu(modType, modName, parentMenu)
+            openSpecificModMenu(modType, modName, parentMenu, selected)
         end
     end)
     
-    lib.showMenu('specific_mod_menu')
+    lib.showMenu('specific_mod_menu', startIndex or 1)
 end
 
 -- Window Tint Menu
-function openWindowTintMenu()
+function openWindowTintMenu(startIndex)
     local ped = PlayerPedId()
     local vehicle = GetVehiclePedIsIn(ped, false)
     
@@ -1998,11 +1998,11 @@ function openWindowTintMenu()
         else
             SetVehicleWindowTint(vehicle, options[selected].args.tintId)
             lib.notify({title = 'Window Tint Changed', description = options[selected].args.tintName, type = 'success'})
-            openWindowTintMenu()
+            openWindowTintMenu(selected)
         end
     end)
     
-    lib.showMenu('window_tint_menu')
+    lib.showMenu('window_tint_menu', startIndex or 1)
 end
 
 -- Neon Lights Menu
@@ -2113,7 +2113,7 @@ function openNeonLightsMenu(startIndex)
 end
 
 -- Wheels Menu
-function openWheelColorMenu()
+function openWheelColorMenu(startIndex)
     local ped = PlayerPedId()
     local vehicle = GetVehiclePedIsIn(ped, false)
     
@@ -2167,11 +2167,11 @@ function openWheelColorMenu()
             local _, pearl = GetVehicleExtraColours(vehicle)
             SetVehicleExtraColours(vehicle, pearl or 0, options[selected].args.colorId)
             lib.notify({title = 'Wheel Color Changed', description = options[selected].args.colorName, type = 'success'})
-            openWheelColorMenu()
+            openWheelColorMenu(selected)
         end
     end)
     
-    lib.showMenu('wheel_color_menu')
+    lib.showMenu('wheel_color_menu', startIndex or 1)
 end
 
 function openWheelAccessoriesMenu(startIndex)
@@ -2282,7 +2282,7 @@ function openWheelAccessoriesMenu(startIndex)
     lib.showMenu('wheel_accessories_menu', startIndex or 1)
 end
 
-function openWheelModMenu(wheelType, wheelTypeName, parentMenu)
+function openWheelModMenu(wheelType, wheelTypeName, parentMenu, startIndex)
     local ped = PlayerPedId()
     local vehicle = GetVehiclePedIsIn(ped, false)
     
@@ -2350,18 +2350,18 @@ function openWheelModMenu(wheelType, wheelTypeName, parentMenu)
         if selected == 1 then
             RemoveVehicleMod(vehicle, 23)
             lib.notify({title = 'Wheels', description = 'Stock wheels applied', type = 'success'})
-            openWheelModMenu(wheelType, wheelTypeName, parentMenu)
+            openWheelModMenu(wheelType, wheelTypeName, parentMenu, selected)
         elseif selected == #options then
             openWheelsMenu()
         else
             SetVehicleWheelType(vehicle, wheelType)
             SetVehicleMod(vehicle, 23, options[selected].args.wheelIndex, false)
             lib.notify({title = 'Wheels', description = options[selected].args.wheelName, type = 'success'})
-            openWheelModMenu(wheelType, wheelTypeName, parentMenu)
+            openWheelModMenu(wheelType, wheelTypeName, parentMenu, selected)
         end
     end)
     
-    lib.showMenu('wheel_mod_menu')
+    lib.showMenu('wheel_mod_menu', startIndex or 1)
 end
 
 function openWheelsMenu()
