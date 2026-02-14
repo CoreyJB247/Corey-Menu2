@@ -573,7 +573,19 @@ local emergencyVehicles = {
         vehicles = {
             {model = "fordambo", name = "SAFR Ford F-250 Ambulance"}
         }
-    }
+    },
+    {
+        subcategory = "San Andreas Training Center",
+        icon = "shield-halved",
+        vehicles = {
+            {model = "10chargtraining", name = "SATC 2010 Dodge Charger PPV"},
+            {model = "14chargtraining", name = "SATC 2014 Dodge Charger PPV"},
+            {model = "14tahoetraining", name = "SATC 2014 Chevy Tahoe"},
+            {model = "11cvpitraining", name = "SATC 2011 Ford CVPI"},
+            {model = "2013fpiutraining", name = "SATC 2013 Ford FPIU"},
+            {model = "2016fpiutraining", name = "SATC 2016 Ford FPIU"},
+        }
+    },
 }
 
 -- Addon vehicles with subcategories
@@ -747,6 +759,7 @@ local addonVehicles = {
             {model = "imperialev", name = "Benefactor Imperial EV"},
             {model = "imperialpas", name = "Benefactor Imperial (Passenger)"},
             {model = "imperial", name = "Benefactor Imperial"},
+            {model = "nspeedo", name = "Vapid Speedo Express"},
             -- Add your addon vehicles here
         }
     },
@@ -773,6 +786,20 @@ local addonVehicles = {
             {model = "segwayciv", name = "Segway"},
             {model = "iak_wheelchair", name = "Wheelchair"},
             {model = "galaxyroamer", name = "Galaxy Roamer Bus RV"},
+            {model = "workf150", name = "Work 2018 Ford F-150"},
+            -- Add your addon vehicles here
+        }
+    },
+    {
+        subcategory = "SADOT",
+        icon = "circle",
+        vehicles = {
+            {model = "autoflagger", name = "DOT Flagger Trailer"},
+            {model = "dotf150", name = "DOT 2021 Ford F-150"},
+            {model = "dotram", name = "DOT 2015 Dodge Ram"},
+            {model = "rollback1", name = "DOT Ford F-250 Tow Truck"},
+            {model = "rollback14", name = "DOT Ford F-250 Tow Truck (4 Door)"},
+            {model = "rollback4", name = "DOT Mack Tow Truck"},
             -- Add your addon vehicles here
         }
     },
