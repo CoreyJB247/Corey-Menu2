@@ -825,9 +825,28 @@ local function SpawnVehicle(model, savedData, keepMenuOpen, menuCallback)
         DeleteEntity(currentVehicle)
     end
     
-    local hash = GetHashKey(model)
+    -- Handle both model names and stored hashes
+    local hash
+    if type(model) == "string" and tonumber(model) then
+        -- Model was stored as a hash string
+        hash = tonumber(model)
+    else
+        -- Model is a name string
+        hash = GetHashKey(model)
+    end
+    
     RequestModel(hash)
-    while not HasModelLoaded(hash) do Wait(0) end
+    local timeout = 0
+    while not HasModelLoaded(hash) and timeout < 100 do 
+        Wait(10)
+        timeout = timeout + 1
+    end
+    
+    if not HasModelLoaded(hash) then
+        lib.notify({title = 'Error', description = 'Failed to load vehicle model', type = 'error'})
+        if menuCallback then menuCallback() end
+        return
+    end
     
     local spawnCoords = coords
     local groundFound, groundZ = GetGroundZFor_3dCoord(coords.x, coords.y, coords.z, false)
@@ -876,7 +895,10 @@ local function SpawnVehicle(model, savedData, keepMenuOpen, menuCallback)
     end
     
     TaskWarpPedIntoVehicle(ped, vehicle, -1)
-    lib.notify({title = 'Vehicle Spawned', description = model:upper(), type = 'success'})
+    
+    -- Show model name/hash for debugging
+    local displayModel = type(model) == "string" and tonumber(model) and "Hash: " .. model or model:upper()
+    lib.notify({title = 'Vehicle Spawned', description = displayModel, type = 'success'})
     
     if keepMenuOpen and menuCallback then
         menuCallback()
@@ -937,7 +959,45 @@ local function SaveCurrentVehicle()
     if not input then return end
     
     local model = GetEntityModel(vehicle)
-    local modelName = GetDisplayNameFromVehicleModel(model):lower()
+    -- GetDisplayNameFromVehicleModel returns the label, not the model name
+    -- We need to store the actual model hash and convert it
+    -- For now, we'll search our vehicle list for the matching hash
+    local modelName = nil
+    
+    -- Search through all categories to find the matching vehicle model
+    for _, category in ipairs(vehicles) do
+        if category.models then
+            for _, veh in ipairs(category.models) do
+                if GetHashKey(veh.model) == model then
+                    modelName = veh.model
+                    break
+                end
+            end
+        end
+        if modelName then break end
+    end
+    
+    -- Check emergency vehicles if not found
+    if not modelName then
+        for _, subcat in ipairs(emergencyVehicles) do
+            if subcat.vehicles then
+                for _, veh in ipairs(subcat.vehicles) do
+                    if GetHashKey(veh.model) == model then
+                        modelName = veh.model
+                        break
+                    end
+                end
+            end
+            if modelName then break end
+        end
+    end
+    
+    -- If still not found, fall back to a simpler approach
+    -- Try using the model name directly from memory
+    if not modelName then
+        -- Last resort: just store the hash and we'll figure it out on spawn
+        modelName = tostring(model)
+    end
     
     local vehicleData = {
         model = modelName,
@@ -1042,7 +1102,41 @@ local function openSavedVehicleOptionsMenu(vehicleIndex, categoryId, categoryNam
             
             if alert == 'confirm' then
                 local model = GetEntityModel(vehicle)
-                local modelName = GetDisplayNameFromVehicleModel(model):lower()
+                -- Same fix as SaveCurrentVehicle - get the proper model name
+                local modelName = nil
+                
+                -- Search through all categories to find the matching vehicle model
+                for _, category in ipairs(vehicles) do
+                    if category.models then
+                        for _, veh in ipairs(category.models) do
+                            if GetHashKey(veh.model) == model then
+                                modelName = veh.model
+                                break
+                            end
+                        end
+                    end
+                    if modelName then break end
+                end
+                
+                -- Check emergency vehicles if not found
+                if not modelName then
+                    for _, subcat in ipairs(emergencyVehicles) do
+                        if subcat.vehicles then
+                            for _, veh in ipairs(subcat.vehicles) do
+                                if GetHashKey(veh.model) == model then
+                                    modelName = veh.model
+                                    break
+                                end
+                            end
+                        end
+                        if modelName then break end
+                    end
+                end
+                
+                -- If still not found, store the hash
+                if not modelName then
+                    modelName = tostring(model)
+                end
                 
                 local vehicleData = {
                     model = modelName,
@@ -1563,7 +1657,321 @@ function openVehicleSpawnerMenu()
 end
 
 -- Vehicle Customization Functions
-function openPrimaryColorMenu(startIndex)
+-- Comprehensive GTA V Color Database
+local vehicleColors = {
+    {
+        category = "Chrome",
+        colors = {
+            {name = 'Chrome', id = 120, hex = '#C8C8C8'},
+        }
+    },
+    {
+        category = "Classic",
+        colors = {
+            {name = 'Black', id = 0, hex = '#0D1116'},
+            {name = 'Carbon Black', id = 147, hex = '#1D1D1D'},
+            {name = 'Graphite', id = 1, hex = '#1C1C1C'},
+            {name = 'Anthracite Black', id = 11, hex = '#27292A'},
+            {name = 'Black Steel', id = 2, hex = '#32383D'},
+            {name = 'Dark Steel', id = 3, hex = '#454B4F'},
+            {name = 'Silver', id = 4, hex = '#999DA0'},
+            {name = 'Bluish Silver', id = 5, hex = '#C2C4C6'},
+            {name = 'Rolled Steel', id = 6, hex = '#979A97'},
+            {name = 'Shadow Silver', id = 7, hex = '#637380'},
+            {name = 'Stone Silver', id = 8, hex = '#63625C'},
+            {name = 'Midnight Silver', id = 9, hex = '#3C3F47'},
+            {name = 'Cast Iron Silver', id = 10, hex = '#444E54'},
+            {name = 'Red', id = 27, hex = '#C00E1A'},
+            {name = 'Torino Red', id = 28, hex = '#DA1918'},
+            {name = 'Formula Red', id = 29, hex = '#B6111B'},
+            {name = 'Lava Red', id = 150, hex = '#BC1917'},
+            {name = 'Blaze Red', id = 30, hex = '#A51E23'},
+            {name = 'Grace Red', id = 31, hex = '#7B1A22'},
+            {name = 'Garnet Red', id = 32, hex = '#8E1B1F'},
+            {name = 'Sunset Red', id = 33, hex = '#6F1818'},
+            {name = 'Cabernet Red', id = 34, hex = '#49111D'},
+            {name = 'Wine Red', id = 143, hex = '#850E21'},
+            {name = 'Candy Red', id = 35, hex = '#B60F25'},
+            {name = 'Hot Pink', id = 135, hex = '#F21F99'},
+            {name = 'Pfister Pink', id = 137, hex = '#FDC0CB'},
+            {name = 'Salmon Pink', id = 136, hex = '#F6AEC7'},
+            {name = 'Sunrise Orange', id = 36, hex = '#F78616'},
+            {name = 'Orange', id = 38, hex = '#F27D0C'},
+            {name = 'Bright Orange', id = 138, hex = '#FE5B01'},
+            {name = 'Gold', id = 99, hex = '#AB8B3E'},
+            {name = 'Bronze', id = 90, hex = '#916532'},
+            {name = 'Yellow', id = 88, hex = '#FFCF20'},
+            {name = 'Race Yellow', id = 89, hex = '#FBE212'},
+            {name = 'Dew Yellow', id = 91, hex = '#F1CC40'},
+            {name = 'Dark Green', id = 49, hex = '#132428'},
+            {name = 'Racing Green', id = 50, hex = '#122E2B'},
+            {name = 'Sea Green', id = 51, hex = '#12383C'},
+            {name = 'Olive Green', id = 52, hex = '#31423F'},
+            {name = 'Bright Green', id = 53, hex = '#155C2D'},
+            {name = 'Gasoline Green', id = 54, hex = '#1B6770'},
+            {name = 'Lime Green', id = 92, hex = '#A8E73A'},
+            {name = 'Midnight Blue', id = 141, hex = '#1E2F4C'},
+            {name = 'Galaxy Blue', id = 61, hex = '#1F2852'},
+            {name = 'Dark Blue', id = 62, hex = '#233155'},
+            {name = 'Saxon Blue', id = 63, hex = '#304C7B'},
+            {name = 'Blue', id = 64, hex = '#47578F'},
+            {name = 'Mariner Blue', id = 65, hex = '#637BA7'},
+            {name = 'Harbor Blue', id = 66, hex = '#394762'},
+            {name = 'Diamond Blue', id = 67, hex = '#D6E7F1'},
+            {name = 'Surf Blue', id = 68, hex = '#76AFBE'},
+            {name = 'Nautical Blue', id = 69, hex = '#345E72'},
+            {name = 'Racing Blue', id = 73, hex = '#2354A1'},
+            {name = 'Ultra Blue', id = 70, hex = '#0B9CE1'},
+            {name = 'Light Blue', id = 74, hex = '#6EA3C6'},
+            {name = 'Chocolate Brown', id = 96, hex = '#3E2F2F'},
+            {name = 'Bison Brown', id = 101, hex = '#5A3C25'},
+            {name = 'Creek Brown', id = 95, hex = '#3B2E25'},
+            {name = 'Feltzer Brown', id = 94, hex = '#6C6B4B'},
+            {name = 'Maple Brown', id = 97, hex = '#503218'},
+            {name = 'Beechwood Brown', id = 103, hex = '#563B1F'},
+            {name = 'Sienna Brown', id = 104, hex = '#7A6C55'},
+            {name = 'Saddle Brown', id = 98, hex = '#734B1F'},
+            {name = 'Moss Brown', id = 100, hex = '#5B4E31'},
+            {name = 'Woodbeech Brown', id = 102, hex = '#685E4D'},
+            {name = 'Straw Brown', id = 99, hex = '#AB8B3E'},
+            {name = 'Sandy Brown', id = 105, hex = '#BBA160'},
+            {name = 'Bleached Brown', id = 106, hex = '#EBE1CE'},
+            {name = 'Schafter Purple', id = 71, hex = '#4E6181'},
+            {name = 'Spinnaker Purple', id = 72, hex = '#2F2D52'},
+            {name = 'Midnight Purple', id = 146, hex = '#1E1D32'},
+            {name = 'Bright Purple', id = 145, hex = '#6B1E52'},
+            {name = 'Cream', id = 107, hex = '#F7EBD5'},
+            {name = 'Ice White', id = 111, hex = '#EFF3F5'},
+            {name = 'Frost White', id = 112, hex = '#F0F5F3'}
+        }
+    },
+    {
+        category = "Metallic",
+        colors = {
+            {name = 'Black', id = 0, hex = '#0D1116'},
+            {name = 'Graphite Black', id = 1, hex = '#1C1C1C'},
+            {name = 'Black Steel', id = 2, hex = '#32383D'},
+            {name = 'Dark Steel', id = 3, hex = '#454B4F'},
+            {name = 'Silver', id = 4, hex = '#999DA0'},
+            {name = 'Bluish Silver', id = 5, hex = '#C2C4C6'},
+            {name = 'Rolled Steel', id = 6, hex = '#979A97'},
+            {name = 'Shadow Silver', id = 7, hex = '#637380'},
+            {name = 'Stone Silver', id = 8, hex = '#63625C'},
+            {name = 'Midnight Silver', id = 9, hex = '#3C3F47'},
+            {name = 'Gun Metal', id = 10, hex = '#444E54'},
+            {name = 'Anthracite Grey', id = 11, hex = '#27292A'},
+            {name = 'Red', id = 27, hex = '#C00E1A'},
+            {name = 'Torino Red', id = 28, hex = '#DA1918'},
+            {name = 'Formula Red', id = 29, hex = '#B6111B'},
+            {name = 'Blaze Red', id = 30, hex = '#A51E23'},
+            {name = 'Graceful Red', id = 31, hex = '#7B1A22'},
+            {name = 'Garnet Red', id = 32, hex = '#8E1B1F'},
+            {name = 'Desert Red', id = 33, hex = '#6F1818'},
+            {name = 'Cabernet Red', id = 34, hex = '#49111D'},
+            {name = 'Candy Red', id = 35, hex = '#B60F25'},
+            {name = 'Sunrise Orange', id = 36, hex = '#F78616'},
+            {name = 'Classic Gold', id = 37, hex = '#C3944F'},
+            {name = 'Orange', id = 38, hex = '#F27D0C'},
+            {name = 'Yellow', id = 88, hex = '#FFCF20'},
+            {name = 'Race Yellow', id = 89, hex = '#FBE212'},
+            {name = 'Bronze', id = 90, hex = '#916532'},
+            {name = 'Dew Yellow', id = 91, hex = '#F1CC40'},
+            {name = 'Lime Green', id = 92, hex = '#A8E73A'},
+            {name = 'Champagne', id = 93, hex = '#9F9E8C'},
+            {name = 'Pueblo Beige', id = 94, hex = '#6C6B4B'},
+            {name = 'Dark Ivory', id = 95, hex = '#3B2E25'},
+            {name = 'Chestnut', id = 96, hex = '#3E2F2F'},
+            {name = 'Maple', id = 97, hex = '#503218'},
+            {name = 'Saddle Brown', id = 98, hex = '#734B1F'},
+            {name = 'Straw Beige', id = 99, hex = '#AB8B3E'},
+            {name = 'Moss Brown', id = 100, hex = '#5B4E31'},
+            {name = 'Bison Brown', id = 101, hex = '#5A3C25'},
+            {name = 'Woodbeech', id = 102, hex = '#685E4D'},
+            {name = 'Beechwood', id = 103, hex = '#563B1F'},
+            {name = 'Sienna', id = 104, hex = '#7A6C55'},
+            {name = 'Sandy Brown', id = 105, hex = '#BBA160'},
+            {name = 'Bleached Brown', id = 106, hex = '#EBE1CE'},
+            {name = 'Cream', id = 107, hex = '#F7EBD5'},
+            {name = 'Util Brown', id = 108, hex = '#3A2916'},
+            {name = 'Util Medium Brown', id = 109, hex = '#785F38'},
+            {name = 'Util Light Brown', id = 110, hex = '#B5976F'},
+            {name = 'Ice White', id = 111, hex = '#EFF3F5'},
+            {name = 'Frost White', id = 112, hex = '#F0F5F3'},
+            {name = 'Midnight Blue', id = 141, hex = '#1E2F4C'},
+            {name = 'Honey Beige', id = 113, hex = '#C7A577'},
+            {name = 'Brown', id = 114, hex = '#5C3317'},
+            {name = 'Dark Brown', id = 115, hex = '#3D2817'},
+            {name = 'Straw Brown', id = 116, hex = '#AA8D5C'},
+            {name = 'Olive Green', id = 52, hex = '#31423F'},
+            {name = 'Dark Green', id = 49, hex = '#132428'},
+            {name = 'Green', id = 50, hex = '#122E2B'},
+            {name = 'Sea Green', id = 51, hex = '#12383C'},
+            {name = 'Bright Green', id = 53, hex = '#155C2D'},
+            {name = 'Metallic Green', id = 54, hex = '#1B6770'},
+            {name = 'Securicor Green', id = 125, hex = '#658F3A'},
+            {name = 'Hunter Green', id = 144, hex = '#223F2D'},
+            {name = 'Taxi Yellow', id = 88, hex = '#FFCF20'},
+            {name = 'Police Car Blue', id = 127, hex = '#293E4C'},
+            {name = 'Midnight Blue', id = 141, hex = '#1E2F4C'},
+            {name = 'Galaxy Blue', id = 61, hex = '#1F2852'},
+            {name = 'Dark Blue', id = 62, hex = '#233155'},
+            {name = 'Saxon Blue', id = 63, hex = '#304C7B'},
+            {name = 'Blue', id = 64, hex = '#47578F'},
+            {name = 'Mariner Blue', id = 65, hex = '#637BA7'},
+            {name = 'Harbor Blue', id = 66, hex = '#394762'},
+            {name = 'Diamond Blue', id = 67, hex = '#D6E7F1'},
+            {name = 'Surf Blue', id = 68, hex = '#76AFBE'},
+            {name = 'Nautical Blue', id = 69, hex = '#345E72'},
+            {name = 'Ultra Blue', id = 70, hex = '#0B9CE1'},
+            {name = 'Purple', id = 71, hex = '#4E6181'},
+            {name = 'Spinnaker Purple', id = 72, hex = '#2F2D52'},
+            {name = 'Racing Blue', id = 73, hex = '#2354A1'},
+            {name = 'Light Blue', id = 74, hex = '#6EA3C6'},
+            {name = 'Baja Blue', id = 75, hex = '#0E5682'},
+            {name = 'Garnet Red', id = 76, hex = '#851A20'},
+            {name = 'Wild Strawberry', id = 135, hex = '#F21F99'},
+            {name = 'Salmon Pink', id = 136, hex = '#F6AEC7'},
+            {name = 'Schafter Purple', id = 145, hex = '#6B1E52'},
+            {name = 'Midnight Purple', id = 146, hex = '#1E1D32'},
+            {name = 'Wine Red', id = 143, hex = '#850E21'},
+            {name = 'Lava Red', id = 150, hex = '#BC1917'},
+            {name = 'Bright Orange', id = 138, hex = '#FE5B01'},
+            {name = 'Pfister Pink', id = 137, hex = '#FDC0CB'},
+            {name = 'Orange', id = 140, hex = '#F2A200'}
+        }
+    },
+    {
+        category = "Matte",
+        colors = {
+            {name = 'Matte Black', id = 12, hex = '#15181A'},
+            {name = 'Matte Gray', id = 13, hex = '#1E2024'},
+            {name = 'Matte Light Gray', id = 14, hex = '#32353A'},
+            {name = 'Matte Ice White', id = 131, hex = '#E4E5E3'},
+            {name = 'Matte White', id = 121, hex = '#F2F2F2'},
+            {name = 'Matte Red', id = 39, hex = '#CF1F21'},
+            {name = 'Matte Dark Red', id = 40, hex = '#732021'},
+            {name = 'Matte Orange', id = 41, hex = '#F27D0C'},
+            {name = 'Matte Yellow', id = 42, hex = '#FFFF00'},
+            {name = 'Matte Lime Green', id = 55, hex = '#A8E73A'},
+            {name = 'Matte Green', id = 128, hex = '#19411F'},
+            {name = 'Matte Forest Green', id = 151, hex = '#113F2E'},
+            {name = 'Matte Foliage Green', id = 155, hex = '#546E4C'},
+            {name = 'Matte Olive Drab', id = 152, hex = '#625D45'},
+            {name = 'Matte Dark Earth', id = 153, hex = '#49442A'},
+            {name = 'Matte Desert Tan', id = 154, hex = '#736F59'},
+            {name = 'Matte Blue', id = 84, hex = '#4C5F81'},
+            {name = 'Matte Dark Blue', id = 82, hex = '#1E2E3F'},
+            {name = 'Matte Midnight Blue', id = 83, hex = '#1A2A3D'},
+            {name = 'Matte Purple', id = 149, hex = '#4E1B6C'},
+            {name = 'Matte Dark Purple', id = 148, hex = '#381A47'}
+        }
+    },
+    {
+        category = "Metals",
+        colors = {
+            {name = 'Brushed Steel', id = 117, hex = '#6B6C6B'},
+            {name = 'Brushed Black Steel', id = 118, hex = '#2A2C2D'},
+            {name = 'Brushed Aluminium', id = 119, hex = '#898D90'},
+            {name = 'Pure Gold', id = 158, hex = '#CBA44F'},
+            {name = 'Brushed Gold', id = 159, hex = '#BE9347'},
+            {name = 'Chrome', id = 120, hex = '#C8C8C8'}
+        }
+    },
+    {
+        category = "Pearlescent",
+        colors = {
+            {name = 'Black', id = 0, hex = '#0D1116'},
+            {name = 'Graphite Black', id = 1, hex = '#1C1C1C'},
+            {name = 'Black Steel', id = 2, hex = '#32383D'},
+            {name = 'Dark Steel', id = 3, hex = '#454B4F'},
+            {name = 'Silver', id = 4, hex = '#999DA0'},
+            {name = 'Bluish Silver', id = 5, hex = '#C2C4C6'},
+            {name = 'Rolled Steel', id = 6, hex = '#979A97'},
+            {name = 'Shadow Silver', id = 7, hex = '#637380'},
+            {name = 'Stone Silver', id = 8, hex = '#63625C'},
+            {name = 'Midnight Silver', id = 9, hex = '#3C3F47'},
+            {name = 'Gun Metal', id = 10, hex = '#444E54'},
+            {name = 'Anthracite Grey', id = 11, hex = '#27292A'},
+            {name = 'Red', id = 27, hex = '#C00E1A'},
+            {name = 'Torino Red', id = 28, hex = '#DA1918'},
+            {name = 'Formula Red', id = 29, hex = '#B6111B'},
+            {name = 'Blaze Red', id = 30, hex = '#A51E23'},
+            {name = 'Graceful Red', id = 31, hex = '#7B1A22'},
+            {name = 'Garnet Red', id = 32, hex = '#8E1B1F'},
+            {name = 'Desert Red', id = 33, hex = '#6F1818'},
+            {name = 'Cabernet Red', id = 34, hex = '#49111D'},
+            {name = 'Candy Red', id = 35, hex = '#B60F25'},
+            {name = 'Sunrise Orange', id = 36, hex = '#F78616'},
+            {name = 'Classic Gold', id = 37, hex = '#C3944F'},
+            {name = 'Orange', id = 38, hex = '#F27D0C'},
+            {name = 'Yellow', id = 88, hex = '#FFCF20'},
+            {name = 'Race Yellow', id = 89, hex = '#FBE212'},
+            {name = 'Bronze', id = 90, hex = '#916532'},
+            {name = 'Dew Yellow', id = 91, hex = '#F1CC40'},
+            {name = 'Lime Green', id = 92, hex = '#A8E73A'},
+            {name = 'Champagne', id = 93, hex = '#9F9E8C'},
+            {name = 'Pueblo Beige', id = 94, hex = '#6C6B4B'},
+            {name = 'Dark Ivory', id = 95, hex = '#3B2E25'},
+            {name = 'Chestnut', id = 96, hex = '#3E2F2F'},
+            {name = 'Maple', id = 97, hex = '#503218'},
+            {name = 'Saddle Brown', id = 98, hex = '#734B1F'},
+            {name = 'Straw Beige', id = 99, hex = '#AB8B3E'},
+            {name = 'Moss Brown', id = 100, hex = '#5B4E31'},
+            {name = 'Bison Brown', id = 101, hex = '#5A3C25'},
+            {name = 'Woodbeech', id = 102, hex = '#685E4D'},
+            {name = 'Beechwood', id = 103, hex = '#563B1F'},
+            {name = 'Sienna', id = 104, hex = '#7A6C55'},
+            {name = 'Sandy Brown', id = 105, hex = '#BBA160'},
+            {name = 'Bleached Brown', id = 106, hex = '#EBE1CE'},
+            {name = 'Cream', id = 107, hex = '#F7EBD5'},
+            {name = 'Util Brown', id = 108, hex = '#3A2916'},
+            {name = 'Util Medium Brown', id = 109, hex = '#785F38'},
+            {name = 'Util Light Brown', id = 110, hex = '#B5976F'},
+            {name = 'Ice White', id = 111, hex = '#EFF3F5'},
+            {name = 'Frost White', id = 112, hex = '#F0F5F3'},
+            {name = 'Honey Beige', id = 113, hex = '#C7A577'},
+            {name = 'Brown', id = 114, hex = '#5C3317'},
+            {name = 'Dark Brown', id = 115, hex = '#3D2817'},
+            {name = 'Straw Brown', id = 116, hex = '#AA8D5C'},
+            {name = 'Olive Green', id = 52, hex = '#31423F'},
+            {name = 'Dark Green', id = 49, hex = '#132428'},
+            {name = 'Green', id = 50, hex = '#122E2B'},
+            {name = 'Sea Green', id = 51, hex = '#12383C'},
+            {name = 'Bright Green', id = 53, hex = '#155C2D'},
+            {name = 'Metallic Green', id = 54, hex = '#1B6770'},
+            {name = 'Galaxy Blue', id = 61, hex = '#1F2852'},
+            {name = 'Dark Blue', id = 62, hex = '#233155'},
+            {name = 'Saxon Blue', id = 63, hex = '#304C7B'},
+            {name = 'Blue', id = 64, hex = '#47578F'},
+            {name = 'Mariner Blue', id = 65, hex = '#637BA7'},
+            {name = 'Harbor Blue', id = 66, hex = '#394762'},
+            {name = 'Diamond Blue', id = 67, hex = '#D6E7F1'},
+            {name = 'Surf Blue', id = 68, hex = '#76AFBE'},
+            {name = 'Nautical Blue', id = 69, hex = '#345E72'},
+            {name = 'Ultra Blue', id = 70, hex = '#0B9CE1'},
+            {name = 'Purple', id = 71, hex = '#4E6181'},
+            {name = 'Spinnaker Purple', id = 72, hex = '#2F2D52'},
+            {name = 'Racing Blue', id = 73, hex = '#2354A1'},
+            {name = 'Light Blue', id = 74, hex = '#6EA3C6'},
+            {name = 'Baja Blue', id = 75, hex = '#0E5682'},
+            {name = 'Garnet Red', id = 76, hex = '#851A20'},
+            {name = 'Wild Strawberry', id = 135, hex = '#F21F99'},
+            {name = 'Salmon Pink', id = 136, hex = '#F6AEC7'},
+            {name = 'Schafter Purple', id = 145, hex = '#6B1E52'},
+            {name = 'Midnight Purple', id = 146, hex = '#1E1D32'},
+            {name = 'Midnight Blue', id = 141, hex = '#1E2F4C'},
+            {name = 'Wine Red', id = 143, hex = '#850E21'},
+            {name = 'Lava Red', id = 150, hex = '#BC1917'},
+            {name = 'Bright Orange', id = 138, hex = '#FE5B01'},
+            {name = 'Pfister Pink', id = 137, hex = '#FDC0CB'},
+            {name = 'Orange', id = 140, hex = '#F2A200'},
+            {name = 'Hunter Green', id = 144, hex = '#223F2D'},
+            {name = 'Securicor Green', id = 125, hex = '#658F3A'}
+        }
+    }
+}
+
+function openColorCategoryMenu(isPrimary, startIndex)
     local ped = PlayerPedId()
     local vehicle = GetVehiclePedIsIn(ped, false)
     
@@ -1572,24 +1980,24 @@ function openPrimaryColorMenu(startIndex)
         return
     end
     
-    local colors = {
-        {name = 'Black', id = 0}, {name = 'Carbon Black', id = 147}, {name = 'Graphite', id = 1},
-        {name = 'Steel', id = 3}, {name = 'Silver', id = 4}, {name = 'Frost White', id = 111},
-        {name = 'Red', id = 27}, {name = 'Torino Red', id = 28}, {name = 'Formula Red', id = 29},
-        {name = 'Blaze Red', id = 30}, {name = 'Hot Pink', id = 135}, {name = 'Orange', id = 38},
-        {name = 'Yellow', id = 88}, {name = 'Dark Green', id = 49}, {name = 'Lime Green', id = 92},
-        {name = 'Blue', id = 64}, {name = 'Light Blue', id = 74}, {name = 'Purple', id = 145}
-    }
-    
     local options = {}
-    for _, color in ipairs(colors) do
+    
+    for _, category in ipairs(vehicleColors) do
         table.insert(options, {
-            label = color.name,
-            icon = 'circle',
-            iconColor = '#' .. string.format("%06x", color.id),
-            args = {colorId = color.id, colorName = color.name}
+            label = category.category,
+            description = #category.colors .. ' colors available',
+            icon = 'palette',
+            iconColor = '#00BFFF',
+            args = {category = category.category}
         })
     end
+    
+    table.insert(options, {
+        label = 'Custom RGB Color',
+        description = 'Enter custom RGB values',
+        icon = 'sliders',
+        iconColor = '#FF69B4'
+    })
     
     table.insert(options, {
         label = '← Back',
@@ -1599,10 +2007,9 @@ function openPrimaryColorMenu(startIndex)
     })
     
     lib.registerMenu({
-        id = 'primary_color_menu',
-        title = 'Primary Color',
+        id = isPrimary and 'primary_color_category_menu' or 'secondary_color_category_menu',
+        title = isPrimary and 'Primary Color' or 'Secondary Color',
         position = 'top-right',
-        
         onClose = function()
             openVehicleCustomizationMenu()
         end,
@@ -1610,73 +2017,127 @@ function openPrimaryColorMenu(startIndex)
     }, function(selected, scrollIndex, args)
         if selected == #options then
             openVehicleCustomizationMenu()
-        else
-            local _, secondary = GetVehicleColours(vehicle)
-            SetVehicleColours(vehicle, options[selected].args.colorId, secondary)
-            lib.notify({title = 'Color Changed', description = options[selected].args.colorName, type = 'success'})
-            openPrimaryColorMenu(selected)
+        elseif selected == #options - 1 then
+            -- Custom RGB
+            openCustomRGBMenu(isPrimary)
+        elseif options[selected].args then
+            openColorSelectionMenu(isPrimary, options[selected].args.category)
         end
     end)
     
-    lib.showMenu('primary_color_menu', startIndex or 1)
+    lib.showMenu(isPrimary and 'primary_color_category_menu' or 'secondary_color_category_menu', startIndex or 1)
+end
+
+function openColorSelectionMenu(isPrimary, categoryName, startIndex)
+    local ped = PlayerPedId()
+    local vehicle = GetVehiclePedIsIn(ped, false)
+    
+    if vehicle == 0 then
+        lib.notify({title = 'Error', description = 'You must be in a vehicle', type = 'error'})
+        return
+    end
+    
+    local currentPrimary, currentSecondary = GetVehicleColours(vehicle)
+    local currentColor = isPrimary and currentPrimary or currentSecondary
+    
+    local categoryData = nil
+    for _, cat in ipairs(vehicleColors) do
+        if cat.category == categoryName then
+            categoryData = cat
+            break
+        end
+    end
+    
+    if not categoryData then return end
+    
+    local options = {}
+    
+    for _, color in ipairs(categoryData.colors) do
+        local isActive = color.id == currentColor
+        table.insert(options, {
+            label = color.name,
+            description = isActive and '✓ Currently Active' or 'Color ID: ' .. color.id,
+            icon = 'circle',
+            iconColor = color.hex,
+            args = {colorId = color.id, colorName = color.name}
+        })
+    end
+    
+    table.insert(options, {
+        label = '← Back',
+        description = 'Return to categories',
+        icon = 'arrow-left',
+        iconColor = '#95a5a6'
+    })
+    
+    lib.registerMenu({
+        id = isPrimary and 'primary_color_selection_menu' or 'secondary_color_selection_menu',
+        title = categoryName .. ' Colors',
+        position = 'top-right',
+        onClose = function()
+            openColorCategoryMenu(isPrimary)
+        end,
+        options = options
+    }, function(selected, scrollIndex, args)
+        if selected == #options then
+            openColorCategoryMenu(isPrimary)
+        else
+            if isPrimary then
+                local _, secondary = GetVehicleColours(vehicle)
+                SetVehicleColours(vehicle, options[selected].args.colorId, secondary)
+            else
+                local primary, _ = GetVehicleColours(vehicle)
+                SetVehicleColours(vehicle, primary, options[selected].args.colorId)
+            end
+            lib.notify({
+                title = (isPrimary and 'Primary' or 'Secondary') .. ' Color',
+                description = options[selected].args.colorName,
+                type = 'success'
+            })
+            Wait(50)
+            openColorSelectionMenu(isPrimary, categoryName, selected)
+        end
+    end)
+    
+    lib.showMenu(isPrimary and 'primary_color_selection_menu' or 'secondary_color_selection_menu', startIndex or 1)
+end
+
+function openCustomRGBMenu(isPrimary)
+    local ped = PlayerPedId()
+    local vehicle = GetVehiclePedIsIn(ped, false)
+    
+    if vehicle == 0 then
+        lib.notify({title = 'Error', description = 'You must be in a vehicle', type = 'error'})
+        return
+    end
+    
+    local input = lib.inputDialog('Custom RGB Color', {
+        {type = 'number', label = 'Red (0-255)', default = 255, min = 0, max = 255, required = true},
+        {type = 'number', label = 'Green (0-255)', default = 255, min = 0, max = 255, required = true},
+        {type = 'number', label = 'Blue (0-255)', default = 255, min = 0, max = 255, required = true}
+    })
+    
+    if input then
+        SetVehicleCustomPrimaryColour(vehicle, input[1], input[2], input[3])
+        if not isPrimary then
+            SetVehicleCustomSecondaryColour(vehicle, input[1], input[2], input[3])
+        end
+        lib.notify({
+            title = 'Custom Color Applied',
+            description = 'RGB(' .. input[1] .. ', ' .. input[2] .. ', ' .. input[3] .. ')',
+            type = 'success'
+        })
+    end
+    
+    openColorCategoryMenu(isPrimary)
+end
+
+function openPrimaryColorMenu(startIndex)
+    openColorCategoryMenu(true, startIndex)
 end
 
 function openSecondaryColorMenu(startIndex)
-    local ped = PlayerPedId()
-    local vehicle = GetVehiclePedIsIn(ped, false)
-    
-    if vehicle == 0 then
-        lib.notify({title = 'Error', description = 'You must be in a vehicle', type = 'error'})
-        return
-    end
-    
-    local colors = {
-        {name = 'Black', id = 0}, {name = 'Carbon Black', id = 147}, {name = 'Graphite', id = 1},
-        {name = 'Steel', id = 3}, {name = 'Silver', id = 4}, {name = 'Frost White', id = 111},
-        {name = 'Red', id = 27}, {name = 'Torino Red', id = 28}, {name = 'Formula Red', id = 29},
-        {name = 'Blaze Red', id = 30}, {name = 'Hot Pink', id = 135}, {name = 'Orange', id = 38},
-        {name = 'Yellow', id = 88}, {name = 'Dark Green', id = 49}, {name = 'Lime Green', id = 92},
-        {name = 'Blue', id = 64}, {name = 'Light Blue', id = 74}, {name = 'Purple', id = 145}
-    }
-    
-    local options = {}
-    for _, color in ipairs(colors) do
-        table.insert(options, {
-            label = color.name,
-            icon = 'circle',
-            iconColor = '#4169E1',
-            args = {colorId = color.id, colorName = color.name}
-        })
-    end
-    
-    table.insert(options, {
-        label = '← Back',
-        description = 'Return to customization',
-        icon = 'arrow-left',
-        iconColor = '#95a5a6'
-    })
-    
-    lib.registerMenu({
-        id = 'secondary_color_menu',
-        title = 'Secondary Color',
-        position = 'top-right',
-        
-        onClose = function()
-            openVehicleCustomizationMenu()
-        end,
-        options = options
-    }, function(selected, scrollIndex, args)
-        if selected == #options then
-            openVehicleCustomizationMenu()
-        else
-            local primary, _ = GetVehicleColours(vehicle)
-            SetVehicleColours(vehicle, primary, options[selected].args.colorId)
-            lib.notify({title = 'Color Changed', description = options[selected].args.colorName, type = 'success'})
-            openSecondaryColorMenu(selected)
-        end
-    end)
-    
-    lib.showMenu('secondary_color_menu', startIndex or 1)
+    openColorCategoryMenu(false, startIndex)
 end
 
 local function openLicensePlateMenu()
